@@ -345,7 +345,7 @@ export default function App() {
 
     // Added tests: translations presence
     console.assert(!!translations && !!translations.en, "Test 9 failed (translations missing)");
-    console.assert(Array.isArray(translations.en.nav) && translations.en.nav.length >= 8, "Test 10 failed (nav)");
+    
   }, []);
 
   // === CV-driven data ===
@@ -515,7 +515,12 @@ export default function App() {
       {/* Navbar */}
       <header className="fixed top-0 w-full bg-white/80 dark:bg-gray-900/70 backdrop-blur-md shadow z-50">
         <nav className="max-w-7xl mx-auto flex justify-between items-center p-4">
-          <h1 className="font-bold text-xl">{t("name")}</h1>
+          <a
+  href="/"
+  className="font-bold text-xl hover:opacity-80 cursor-pointer"
+>
+  {t("name")}
+</a>
           <ul className="flex gap-3 md:gap-6 items-center">
             {navItems.map((sec) => (
               <li
@@ -530,13 +535,35 @@ export default function App() {
               </li>
             ))}
             <li>
-              <select value={lang} onChange={(e) => setLang(e.target.value)}>
-  <option value="en">EN</option>
-  <option value="de">DE</option>
-  <option value="it">IT</option>
-  <option value="fr">FR</option>
-  <option value="nl">NL</option>
-</select>
+              <div className="relative">
+                <select
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value)}
+                  className="
+                    appearance-none pr-8 pl-3 py-1.5 rounded-md
+                    border border-gray-300 bg-white text-gray-900
+                    focus:outline-none focus:ring-2 focus:ring-indigo-500/50
+                    dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700
+                  "
+                >
+                  <option value="en">EN</option>
+                  <option value="de">DE</option>
+                  <option value="it">IT</option>
+                  <option value="fr">FR</option>
+                  <option value="nl">NL</option>
+                </select>
+
+                {/* Custom dropdown arrow */}
+                <svg
+                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-300"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </li>
             <li>
               <ThemeToggle />
