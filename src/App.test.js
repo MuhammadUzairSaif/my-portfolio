@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
+test('renders the portfolio headline and certifications', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Muhammad Uzair Saif' })).toBeInTheDocument();
+  expect(screen.getByText('Salesforce Certified Platform Developer II')).toBeInTheDocument();
 });
