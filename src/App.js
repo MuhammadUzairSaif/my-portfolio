@@ -1,73 +1,25 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
-/** Pick an active section id from IntersectionObserver entries. */
+// Pick the section that is *most visible* in the viewport
 export function computeActiveFromEntries(entries, prevId) {
-  let nextId = prevId;
-  if (!Array.isArray(entries)) return nextId;
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
-    if (!entry || !entry.isIntersecting) continue;
-    const target = entry.target;
-    if (target && typeof target.id === "string" && target.id.length > 0) {
-      nextId = target.id;
+  if (!Array.isArray(entries) || entries.length === 0) return prevId;
+
+  let bestId = prevId;
+  let bestRatio = 0;
+
+  for (const e of entries) {
+    if (!e || !e.isIntersecting) continue;
+    const id = e.target?.id;
+    if (typeof id !== "string" || id.length === 0) continue;
+
+    const ratio = typeof e.intersectionRatio === "number" ? e.intersectionRatio : 1;
+    if (ratio >= bestRatio) {
+      bestRatio = ratio;
+      bestId = id;
     }
   }
-  return nextId;
-}
-
-/** Lightweight, dependency-free typewriter */
-function Typewriter({
-  strings,
-  typeSpeed = 80,
-  backSpeed = 50,
-  pause = 1200,
-  loop = true,
-  className = "",
-}) {
-  const [idx, setIdx] = useState(0);
-  const [len, setLen] = useState(0);
-  const [deleting, setDeleting] = useState(false);
-  const current = strings?.[idx] || "";
-
-  useEffect(() => {
-    if (!current) return;
-    let timeout = 0;
-
-    if (!deleting && len < current.length) {
-      timeout = typeSpeed;
-      const t = setTimeout(() => setLen((l) => l + 1), timeout);
-      return () => clearTimeout(t);
-    }
-
-    if (!deleting && len === current.length) {
-      const t = setTimeout(() => setDeleting(true), pause);
-      return () => clearTimeout(t);
-    }
-
-    if (deleting && len > 0) {
-      timeout = backSpeed;
-      const t = setTimeout(() => setLen((l) => l - 1), timeout);
-      return () => clearTimeout(t);
-    }
-
-    if (deleting && len === 0) {
-      const next = (idx + 1) % strings.length;
-      setIdx(next);
-      setDeleting(false);
-      if (!loop && next === 0) {
-        setLen(current.length);
-        setDeleting(false);
-      }
-    }
-  }, [current, deleting, len, typeSpeed, backSpeed, pause, idx, strings?.length, loop]);
-
-  return (
-    <span className={className} aria-live="polite">
-      {current.slice(0, len)}
-      <span className="inline-block w-1 h-6 align-middle ml-1 animate-pulse bg-current rounded-sm" />
-    </span>
-  );
+  return bestId;
 }
 
 /** Theme toggle with localStorage persistence */
@@ -112,9 +64,9 @@ export default function App() {
     () => ({
       en: {
         name: "Muhammad Uzair Saif",
-        headline: "Versatile Software Engineer | Salesforce & MuleSoft Specialist",
+        headline: "Salesforce & MuleSoft Technical Consultant",
         heroText:
-          "6+ years delivering enterprise SaaS on Salesforce, .NET, and middleware (MuleSoft, IBM IIB). Strong in Agile and SDLC, scalable architectures, and cross-functional collaboration.",
+          "7+ years delivering enterprise SaaS on Salesforce, .NET, and middleware (MuleSoft, IBM IIB). Strong in Agile and SDLC, scalable architectures, and cross-functional collaboration.",
         nav: ["home", "portfolio", "features", "experience", "education", "certifications", "contact"],
         viewWork: "View Work",
         features: "Skills Snapshot",
@@ -239,11 +191,12 @@ export default function App() {
     []
   );
 
-  const [lang, setLang] = useState("en");
+  const [lang] = useState("en");
   const t = (key, ...args) =>
     typeof translations[lang][key] === "function"
       ? translations[lang][key](...args)
       : translations[lang][key];
+  const sectionIds = ["home", "portfolio", "features", "experience", "education", "certifications", "contact"];
   const navItems = translations[lang].nav;
 
   // Scroll progress bar
@@ -296,16 +249,23 @@ export default function App() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // ⟵ ignore IO updates while we’re animating to a clicked section
-        if (Date.now() < suppressIOUntil.current) return;
+        // If you keep the click-suppression window, honor it:
+        if (Date.now() < (suppressIOUntil.current || 0)) return;
 
         const nextId = computeActiveFromEntries(entries, activeRef.current);
-        if (typeof nextId === "string" && nextId && nextId !== activeRef.current) {
+        if (nextId && nextId !== activeRef.current) {
           activeRef.current = nextId;
           setActiveSection(nextId);
         }
       },
-      { threshold: 0.4, root: null, rootMargin: "-64px 0px -35% 0px" }
+      {
+        root: null,
+        // Account for fixed header and keep a tighter "center" window,
+        // so the section closest to middle wins
+        rootMargin: "-72px 0px -55% 0px",
+        // Dense thresholds give stable ratios
+        threshold: [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
+      }
     );
 
     sections.forEach((sec) => {
@@ -377,8 +337,37 @@ export default function App() {
     []
   );
 
+  const certifications = useMemo(
+    () => [
+      { name: "Salesforce Certified Platform Developer II", issuer: "Salesforce", issued: "Issued Jan 2025" },
+      { name: "Salesforce Certified AI Specialist", issuer: "Salesforce", issued: "Issued Dec 2024" },
+      { name: "MuleSoft Certified Associate", issuer: "MuleSoft", issued: "Issued Dec 2024" },
+      { name: "Salesforce Certified Associate", issuer: "Salesforce", issued: "Issued Dec 2024" },
+      { name: "Salesforce Certified Data Cloud Consultant", issuer: "Salesforce", issued: "Issued Nov 2024" },
+      { name: "Salesforce Certified Platform Developer I", issuer: "Salesforce", issued: "Issued Oct 2024" },
+      { name: "Salesforce Certified Platform App Builder", issuer: "Salesforce", issued: "Issued Jan 2023" },
+      { name: "Salesforce Certified Administrator", issuer: "Salesforce", issued: "Issued Sep 2022" },
+      { name: "MuleSoft Certified Developer I", issuer: "MuleSoft", issued: "Issued Feb 2022" },
+      { name: "MuleSoft Certified Developer II", issuer: "MuleSoft" },
+      { name: "Salesforce Certified Sharing and Visibility Architect", issuer: "Salesforce" },
+      { name: "Salesforce Certified Sales Cloud Consultant", issuer: "Salesforce" },
+    ],
+    []
+  );
+
   const experience = useMemo(
     () => [
+      {
+        title: "Salesforce and MuleSoft Consultant",
+        company: "Clyde Ventures — Manchester, United Kingdom (Client: SEFE Energy UK)",
+        date: "Oct 2025 – Present",
+        bullets: [
+          "Client-facing Salesforce and MuleSoft consultant supporting SEFE Energy UK's B2B energy sales operations.",
+          "Administer Sales Cloud and Energy & Utilities Cloud, including access, security, data quality, Flows, and declarative automation.",
+          "Built MuleSoft integrations for Experian and D&B lead verification and improved Gorilla forecasting integration latency.",
+          "Deliver reporting, dashboards, Copado releases, end-user training, and mentorship for two junior MuleSoft developers.",
+        ],
+      },
       {
         title: "Technical Consultant",
         company: "Tectonic Pvt. Limited",
@@ -421,6 +410,7 @@ export default function App() {
         title: "Breckenridge Grand Vacations — Salesforce",
         tags: ["Salesforce", "REST", "Integrations"],
         img: "breckenridgegrandvacations.jpg",
+        caseStudy: { problem: "Connect customer-facing systems with Salesforce reliably.", contribution: "Delivered Salesforce REST integration work.", outcome: "Enabled dependable data exchange across connected systems." },
         links: { demo: "https://breckenridgegrandvacations.com/" },
       },
       {
@@ -428,6 +418,7 @@ export default function App() {
         title: "Yellowstone Club — MuleSoft",
         tags: ["MuleSoft", "APIs", "Salesforce"],
         img: "yellowstoneclub.jpg",
+        caseStudy: { problem: "Provide reusable integration services for Salesforce workflows.", contribution: "Built and supported MuleSoft API integrations.", outcome: "Improved consistency and visibility across connected services." },
         links: { demo: "https://yellowstoneclub.com/" },
       },
       {
@@ -435,6 +426,7 @@ export default function App() {
         title: "Biltmore — Salesforce & MuleSoft",
         tags: ["Salesforce", "MuleSoft", "Real-time"],
         img: "biltmore.jpg",
+        caseStudy: { problem: "Keep operational data synchronised in real time.", contribution: "Implemented Salesforce and MuleSoft integration patterns.", outcome: "Supported timely, reliable data movement between systems." },
         links: { demo: "https://www.biltmore.com/" },
       },
       {
@@ -442,6 +434,7 @@ export default function App() {
         title: "Cherokee Nation — Salesforce Marketing Cloud & MuleSoft",
         tags: ["LWC", "Community", "Engagement", "Integration"],
         img: "cherokee.jpg",
+        caseStudy: { problem: "Connect community engagement experiences with marketing operations.", contribution: "Contributed LWC, community, and integration work.", outcome: "Supported more connected engagement journeys." },
         links: { demo: "https://www.cherokee.org/" },
       },
       {
@@ -449,6 +442,7 @@ export default function App() {
         title: "NetConnect — Payment Gateway (KEENU)",
         tags: [".NET", "Payments", "Security"],
         img: "Keenu.jpg",
+        caseStudy: { problem: "Process digital payments securely across providers.", contribution: "Integrated payment providers and built secure .NET services.", outcome: "Supported a scalable payment-gateway capability." },
         links: { demo: "https://keenu.pk/" },
       },
       {
@@ -456,6 +450,7 @@ export default function App() {
         title: "Merchant Portal (KEENU)",
         tags: [".NET Core", "Reporting", "APIs"],
         img: "MerchantPortal.jpg",
+        caseStudy: { problem: "Give merchants clear access to reporting and operational APIs.", contribution: "Built .NET Core reporting and API functionality.", outcome: "Improved access to merchant data and reporting workflows." },
         links: { demo: "https://merchant.keenu.pk/MOB/" },
       },
     ],
@@ -500,8 +495,26 @@ export default function App() {
       p.tags.some((t) => t.toLowerCase().includes(query.toLowerCase()))
   );
   const [modal, setModal] = useState(null);
+  const [formStatus, setFormStatus] = useState("idle");
   const openModal = (p) => setModal(p);
   const closeModal = () => setModal(null);
+  const submitContactForm = async (event) => {
+    event.preventDefault();
+    if (!FORM_ENDPOINT) return;
+    setFormStatus("sending");
+    try {
+      const response = await fetch(FORM_ENDPOINT, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: new FormData(event.currentTarget),
+      });
+      if (!response.ok) throw new Error("Submission failed");
+      event.currentTarget.reset();
+      setFormStatus("success");
+    } catch {
+      setFormStatus("error");
+    }
+  };
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") closeModal();
@@ -544,44 +557,27 @@ export default function App() {
             {t("name")}
           </a>
           <ul className="flex gap-3 md:gap-6 items-center">
-            {navItems.map((sec) => (
+            {navItems.map((label, index) => {
+              const sectionId = sectionIds[index];
+              return (
               <li
-                key={sec}
-                data-testid={`nav-${sec}`}
-                className={`cursor-pointer capitalize hover:opacity-80 ${
-                  activeSection === sec
-                    ? "text-indigo-600 dark:text-indigo-400 font-semibold"
-                    : ""
-                }`}
-                onClick={() => scrollToSection(sec)}
+                key={sectionId}
+                data-testid={`nav-${sectionId}`}
               >
-                {sec}
+                <button
+                  type="button"
+                  className={`capitalize hover:opacity-80 ${
+                    activeSection === sectionId
+                      ? "text-indigo-600 dark:text-indigo-400 font-semibold"
+                      : ""
+                  }`}
+                  onClick={() => scrollToSection(sectionId)}
+                >
+                  {label}
+                </button>
               </li>
-            ))}
-            <li>
-              <div className="relative">
-                <select
-                  value={lang}
-                  onChange={(e) => setLang(e.target.value)}
-                  className="appearance-none pr-8 pl-3 py-1.5 rounded-md border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700"
-                >
-                  <option value="en">EN</option>
-                  <option value="de">DE</option>
-                  <option value="it">IT</option>
-                  <option value="fr">FR</option>
-                  <option value="nl">NL</option>
-                </select>
-                <svg
-                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-300"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </li>
+              );
+            })}
             <li>
               <ThemeToggle />
             </li>
@@ -596,7 +592,7 @@ export default function App() {
       >
         <motion.img
           src="ProfilePic.jpg"
-          alt="Profile"
+          alt="Muhammad Uzair Saif, Salesforce and MuleSoft Technical Consultant"
           className="w-40 h-40 rounded-full shadow-lg border-4 border-white cursor-pointer"
           initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.5 }}
           animate={shouldReduceMotion ? false : { opacity: 1, scale: 1 }}
@@ -611,7 +607,7 @@ export default function App() {
           >
             <motion.img
               src="ProfilePic.jpg"
-              alt="Profile Enlarged"
+              alt="Enlarged portrait of Muhammad Uzair Saif"
               className="max-w-[90%] max-h-[90%] rounded-xl shadow-2xl border-4 border-white"
               initial={{ opacity: 0, scale: 0.7 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -620,25 +616,30 @@ export default function App() {
           </div>
         )}
 
-        <h2 className="text-4xl md:text-5xl font-bold mt-6 text-center">
-          <Typewriter
-            strings={[t("name"), t("headline")]}
-            typeSpeed={80}
-            backSpeed={50}
-            pause={1200}
-            loop
-            className="bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-cyan-600 bg-clip-text text-transparent"
-          />
-        </h2>
+        <h1 className="text-4xl md:text-5xl font-bold mt-6 text-center bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-cyan-600 bg-clip-text text-transparent">
+          {t("name")}
+        </h1>
+        <p className="mt-3 text-xl md:text-2xl font-semibold text-center text-gray-800 dark:text-gray-100">
+          {t("headline")}
+        </p>
         <p className="mt-4 text-lg text-gray-700 dark:text-gray-300 max-w-3xl text-center px-4">
           {t("heroText")}
         </p>
+        <p className="mt-3 rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm dark:bg-gray-900/70 dark:text-gray-200">
+          Manchester, UK · Open to UK remote and hybrid Salesforce & MuleSoft consulting roles
+        </p>
         <div className="mt-6 flex flex-wrap gap-3 justify-center">
           <button
-            onClick={() => scrollToSection(translations[lang].nav[1])}
+            onClick={() => scrollToSection(sectionIds[1])}
             className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:brightness-110"
           >
             {t("viewWork")}
+          </button>
+          <button
+            onClick={() => scrollToSection(sectionIds[6])}
+            className="px-4 py-2 rounded-lg border border-indigo-600 text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300 dark:border-indigo-400 dark:hover:bg-gray-800"
+          >
+            Request a 15-minute call
           </button>
           <a
             href={resumeUrl}
@@ -700,17 +701,21 @@ export default function App() {
       </section>
 
       {/* Portfolio */}
-      <section id={translations[lang].nav[1]} className="scroll-mt-24 relative py-20 w-full">
+      <section id={sectionIds[1]} className="scroll-mt-24 relative py-20 w-full">
         <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 via-sky-500 to-indigo-500 dark:bg-black dark:bg-none" />
         <div className="relative max-w-7xl mx-auto px-4 text-white">
           <h2 className="text-4xl font-extrabold mb-6 drop-shadow-lg text-center">{t("portfolio")}</h2>
           <div className="flex justify-center">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("searchPlaceholder")}
-              className="mb-10 w-full md:w-1/2 px-4 py-3 rounded-xl border border-white/30 bg-white/90 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/70"
-            />
+            <div className="w-full md:w-1/2">
+              <label htmlFor="project-search" className="mb-2 block text-sm font-semibold">Search projects</label>
+              <input
+                id="project-search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("searchPlaceholder")}
+                className="mb-10 w-full px-4 py-3 rounded-xl border border-white/30 bg-white/90 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/70"
+              />
+            </div>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {filtered.map((p, idx) => (
@@ -723,6 +728,12 @@ export default function App() {
                 whileHover={shouldReduceMotion ? undefined : { y: -4, scale: 1.02 }}
                 className="backdrop-blur bg-white/90 text-gray-900 dark:bg-gray-900/90 dark:text-white rounded-xl shadow overflow-hidden cursor-pointer border border-white/20"
                 onClick={() => openModal(p)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") openModal(p);
+                }}
+                tabIndex={0}
+                role="button"
+                aria-label={`Open case study: ${p.title}`}
               >
                 <img src={p.img} alt={p.title} className="w-full h-40 object-cover" loading="lazy" />
                 <div className="p-4 text-left">
@@ -745,14 +756,17 @@ export default function App() {
 
         {/* Project Modal */}
         {modal && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={closeModal}>
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={closeModal} role="presentation">
             <div
               className="max-w-3xl w-full bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="case-study-title"
             >
               <img src={modal.img} alt={modal.title} className="w-full h-56 object-cover" />
               <div className="p-6">
-                <h3 className="text-2xl font-semibold">{modal.title}</h3>
+                <h3 id="case-study-title" className="text-2xl font-semibold">{modal.title}</h3>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {modal.tags.map((tg) => (
                     <span key={tg} className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700">
@@ -772,6 +786,12 @@ export default function App() {
                     </a>
                   )}
                 </div>
+                <dl className="mt-6 grid gap-4 text-left text-sm">
+                  <div><dt className="font-semibold">Business problem</dt><dd className="mt-1 opacity-80">{modal.caseStudy.problem}</dd></div>
+                  <div><dt className="font-semibold">My contribution</dt><dd className="mt-1 opacity-80">{modal.caseStudy.contribution}</dd></div>
+                  <div><dt className="font-semibold">Outcome</dt><dd className="mt-1 opacity-80">{modal.caseStudy.outcome}</dd></div>
+                  <div><dt className="font-semibold">Stack</dt><dd className="mt-1 opacity-80">{modal.tags.join(" · ")}</dd></div>
+                </dl>
                 <div className="mt-6 text-right">
                   <button
                     className="px-4 py-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -787,7 +807,7 @@ export default function App() {
       </section>
 
       {/* Skills / Features */}
-      <section id={translations[lang].nav[2]} className="scroll-mt-24 relative py-20 w-full">
+      <section id={sectionIds[2]} className="scroll-mt-24 relative py-20 w-full min-h-[60vh]">
         <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-600 via-rose-500 to-orange-400 dark:bg-black dark:bg-none" />
         <div className="relative max-w-7xl mx-auto px-4 text-white">
           <h2 className="text-4xl font-extrabold mb-12 drop-shadow-lg text-center">{t("features")}</h2>
@@ -900,7 +920,7 @@ export default function App() {
               ["15+", t("projects")],
               ["20+", t("integrations")],
               [12, t("certsCount")],
-              ["6+", t("yearsExp")],
+              ["7+", t("yearsExp")],
             ].map(([num, label], i) => (
               <div
                 key={i}
@@ -915,7 +935,7 @@ export default function App() {
       </section>
 
       {/* Experience */}
-      <section id={translations[lang].nav[3]} className="scroll-mt-24 relative py-20 w-full">
+      <section id={sectionIds[3]} className="scroll-mt-24 relative py-20 w-full">
         <div className="absolute inset-0 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-700 dark:bg-black dark:bg-none" />
         <div className="relative max-w-7xl mx-auto px-4 text-white">
           <h2 className="text-4xl font-extrabold mb-12 drop-shadow-lg text-center">
@@ -950,7 +970,7 @@ export default function App() {
       </section>
 
       {/* Education */}
-      <section id={translations[lang].nav[4]} className="scroll-mt-24 relative py-20 w-full">
+      <section id={sectionIds[4]} className="scroll-mt-24 relative py-20 w-full">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 dark:bg-black dark:bg-none" />
         <div className="relative max-w-7xl mx-auto px-4 text-white">
           <h2 className="text-4xl font-extrabold mb-12 drop-shadow-lg text-center">{t("education")}</h2>
@@ -978,34 +998,29 @@ export default function App() {
       </section>
 
       {/* Certifications */}
-      <section id={translations[lang].nav[5]} className="scroll-mt-24 relative py-20">
+      <section id={sectionIds[5]} className="scroll-mt-24 relative py-20">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 dark:bg-black dark:bg-none" />
         <div className="relative max-w-7xl mx-auto text-center px-4 text-white">
           <h2 className="text-4xl font-extrabold mb-12 drop-shadow-lg">{t("certifications")}</h2>
           <div className="grid md:grid-cols-3 gap-6">
-            {[
-              "Salesforce Administrator",
-              "Platform App Builder",
-              "Platform Developer I",
-              "Platform Developer II",
-              "Data Cloud Consultant",
-              "AI Specialist",
-              "AI Associate",
-              "Sharing & Visibility Architect",
-              "Sales Cloud Consultant",
-              "Salesforce Certified Associate",
-              "MuleSoft Developer",
-              "MuleSoft Associate",
-            ].map((c, i) => (
+            {certifications.map((cert, i) => (
               <motion.div
-                key={i}
+                key={cert.name}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: i * 0.05 }}
                 className="backdrop-blur bg-white/90 text-gray-900 dark:bg-gray-900/90 dark:text-white p-6 rounded-xl shadow-lg hover:scale-105 transform transition"
               >
-                <span className="font-semibold">{c}</span>
+                <div className="flex items-start gap-3 text-left">
+                  <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-200">
+                    ✓
+                  </span>
+                  <div>
+                    <h3 className="font-semibold leading-snug">{cert.name}</h3>
+                    <p className="mt-1 text-sm opacity-80">{cert.issuer}{cert.issued ? ` · ${cert.issued}` : ""}</p>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -1013,42 +1028,36 @@ export default function App() {
       </section>
 
       {/* Contact */}
-      <section id={translations[lang].nav[6]} className="scroll-mt-24 py-20 text-center">
+      <section id={sectionIds[6]} className="scroll-mt-24 py-20 text-center">
         <div className="max-w-7xl mx-auto px-4">
           <h2 className="text-3xl font-bold mb-6">{t("contact")}</h2>
           <form
             className="max-w-lg mx-auto space-y-4 text-left"
-            action={FORM_ENDPOINT || undefined}
-            method={FORM_ENDPOINT ? "POST" : undefined}
-            onSubmit={(e) => {
-              if (!FORM_ENDPOINT) {
-                e.preventDefault();
-                alert("Set FORM_ENDPOINT (e.g., Formspree) to enable submissions.");
-              }
-            }}
+            onSubmit={submitContactForm}
           >
-            <input name="name" type="text" placeholder="Your Name" className="w-full border p-3 rounded bg-white dark:bg-gray-900" required />
-            <input name="email" type="email" placeholder="Your Email" className="w-full border p-3 rounded bg-white dark:bg-gray-900" required />
-            <input name="phone" type="text" placeholder="Phone Number" className="w-full border p-3 rounded bg-white dark:bg-gray-900" required />
-            <textarea name="message" placeholder="Your Message" className="w-full border p-3 rounded bg-white dark:bg-gray-900" rows={5} required />
-            <button type="submit" className="bg-indigo-600 text-white w-full py-3 rounded hover:brightness-110">
-              {t("send")}
+            <label className="block"><span className="mb-1 block font-medium">Name</span><input name="name" type="text" autoComplete="name" className="w-full border p-3 rounded bg-white dark:bg-gray-900" required /></label>
+            <label className="block"><span className="mb-1 block font-medium">Email</span><input name="email" type="email" autoComplete="email" className="w-full border p-3 rounded bg-white dark:bg-gray-900" required /></label>
+            <label className="block"><span className="mb-1 block font-medium">Phone <span className="font-normal opacity-70">(optional)</span></span><input name="phone" type="tel" autoComplete="tel" className="w-full border p-3 rounded bg-white dark:bg-gray-900" /></label>
+            <label className="block"><span className="mb-1 block font-medium">How can I help?</span><textarea name="message" className="w-full border p-3 rounded bg-white dark:bg-gray-900" rows={5} required /></label>
+            <p className="text-sm opacity-75">Your details are used only to respond to this enquiry.</p>
+            <button type="submit" disabled={formStatus === "sending"} className="bg-indigo-600 text-white w-full py-3 rounded hover:brightness-110 disabled:opacity-60">
+              {formStatus === "sending" ? "Sending…" : t("send")}
             </button>
+            {formStatus === "success" && <p role="status" className="text-sm text-green-700 dark:text-green-300">Thanks — your message has been sent.</p>}
+            {formStatus === "error" && <p role="alert" className="text-sm text-red-700 dark:text-red-300">Your message could not be sent. Please try again.</p>}
           </form>
         </div>
 
-        {/* Find me (footer social) */}
+        {/* Compact footer links */}
         <div className="mt-10 text-center">
-          <div className="tracking-[0.25em] text-sm font-semibold uppercase text-gray-700 dark:text-gray-300">
-            Find me
-          </div>
-          <div className="mt-5 flex items-center justify-center gap-5">
+          <div className="text-sm text-gray-700 dark:text-gray-300">Manchester, UK · Connect on LinkedIn or Trailblazer</div>
+          <div className="mt-3 flex items-center justify-center gap-3">
             <a
               href={SOCIALS.linkedin}
               target="_blank"
               rel="noreferrer"
               aria-label="LinkedIn"
-              className="group w-16 h-16 inline-flex items-center justify-center rounded-2xl bg-white shadow-[6px_6px_14px_rgba(0,0,0,0.08),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/70 transition transform hover:-translate-y-0.5 hover:shadow-[10px_10px_20px_rgba(0,0,0,0.10),-8px_-8px_20px_rgba(255,255,255,0.9)] dark:bg-gray-900 dark:border-gray-800 dark:shadow-none dark:hover:bg-gray-800"
+              className="group w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white shadow-sm border border-white/70 transition hover:-translate-y-0.5 dark:bg-gray-900 dark:border-gray-800"
             >
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" className="opacity-80 group-hover:opacity-100">
                 <path
@@ -1064,7 +1073,7 @@ export default function App() {
               target="_blank"
               rel="noreferrer"
               aria-label="Salesforce Trailblazer"
-              className="group w-16 h-16 inline-flex items-center justify-center rounded-2xl bg-white shadow-[6px_6px_14px_rgba(0,0,0,0.08),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/70 transition transform hover:-translate-y-0.5 hover:shadow-[10px_10px_20px_rgba(0,0,0,0.10),-8px_-8px_20px_rgba(255,255,255,0.9)] dark:bg-gray-900 dark:border-gray-800 dark:shadow-none dark:hover:bg-gray-800"
+              className="group w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white shadow-sm border border-white/70 transition hover:-translate-y-0.5 dark:bg-gray-900 dark:border-gray-800"
             >
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" className="opacity-80 group-hover:opacity-100">
                 <path
